@@ -1,22 +1,25 @@
 FROM php:8.2-fpm
 
-# 必要なパッケージのインストール
+# Laravel に必要な拡張をインストール
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libonig-dev libxml2-dev libpq-dev libzip-dev \
+    nginx \
+    git unzip curl zip libzip-dev libpq-dev libonig-dev libxml2-dev \
     && docker-php-ext-install pdo pdo_mysql zip
 
-# Composer インストール
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# プロジェクトファイルのコピー
+WORKDIR /var/www
 COPY . /var/www
 
-WORKDIR /var/www
+# Laravel セットアップ
+RUN composer install --no-dev --optimize-autoloader \
+    && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-RUN composer install --no-dev --optimize-autoloader
+# nginx.conf を配置
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf
 
-# Laravel ストレージ権限設定
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+EXPOSE 80
 
-EXPOSE 9000
-CMD ["php-fpm"]
+# 起動時に nginx と php-fpm 両方を実行
+CMD service php8.2-fpm start && nginx -g "daemon off;"
